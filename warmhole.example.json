@@ -1,0 +1,16 @@
+{
+  "publicUrl": "https://ap.example.dev",
+  "sites": [
+    {
+      "id": "my-blog",
+      "handle": "me",
+      "domain": "blog.example.dev",
+      "feedUrl": "https://blog.example.dev/feed.xml",
+      "name": "My Blog",
+      "summary": "Things I write.",
+      "icon": "https://blog.example.dev/avatar.png",
+      "syncTokenEnv": "MY_BLOG_SYNC_TOKEN",
+      "deleteMissing": false
+    }
+  ]
+}

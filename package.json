@@ -1,0 +1,29 @@
+{
+  "name": "warmhole",
+  "version": "0.1.0",
+  "description": "A warm little portal from your static site into the fediverse.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fedify/fedify": "^2.4.4",
+    "@fedify/hono": "^2.4.4",
+    "@fedify/sqlite": "^2.4.4",
+    "@fedify/vocab": "^2.4.4",
+    "@hono/node-server": "^2.1.5",
+    "@logtape/logtape": "^2.4.1",
+    "feedsmith": "^3.0.1",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}
