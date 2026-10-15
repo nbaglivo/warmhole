@@ -4,8 +4,15 @@ import { diff, contentHash, GuardError, type StoredPost } from './diff.ts'
 import { entry } from '../test/feeds.ts'
 
 function stored(...entries: ReturnType<typeof entry>[]): StoredPost[] {
-  return entries.map((e) => ({ entryId: e.id, contentHash: contentHash(e), deleted: false }))
+  return entries.map((e) => ({ entryId: e.id, contentHash: contentHash(e), deleted: false, published: e.published.toISOString() }))
 }
+
+test('posts older than the feed window are not deleted', () => {
+  const at = (month: number) => ({ published: new Date(Date.UTC(2026, month, 1)) })
+  const posts = stored(entry('a', at(0)), entry('b', at(1)), entry('c', at(2)))
+  assert.deepEqual(diff(posts, [entry('b', at(1)), entry('c', at(2)), entry('d', at(3))], { deleteMissing: true }).delete, [])
+  assert.deepEqual(diff(posts, [entry('b', at(1)), entry('d', at(3))], { deleteMissing: true }).delete, [entry('c').id])
+})
 
 test('first sync creates everything silently', () => {
   const result = diff([], [entry('a'), entry('b')], { deleteMissing: true })
@@ -40,7 +47,7 @@ test('missing entries are deleted only with deleteMissing', () => {
 })
 
 test('a deleted post that reappears stays deleted', () => {
-  const posts: StoredPost[] = [...stored(entry('a')), { entryId: entry('b').id, contentHash: 'old', deleted: true }]
+  const posts: StoredPost[] = [...stored(entry('a')), { entryId: entry('b').id, contentHash: 'old', deleted: true, published: '2026-10-01T00:00:00.000Z' }]
   const result = diff(posts, [entry('a'), entry('b', { title: 'back' })], { deleteMissing: true })
   assert.deepEqual(result.create, [])
   assert.deepEqual(result.update, [])

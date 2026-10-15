@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { FeedEntry } from './feed.ts'
 
-export type StoredPost = { entryId: string; contentHash: string; deleted: boolean }
+export type StoredPost = { entryId: string; contentHash: string; deleted: boolean; published: string }
 
 export type Changes = { create: FeedEntry[]; update: FeedEntry[]; delete: string[]; silent: boolean }
 
@@ -35,7 +35,10 @@ export function diff(stored: StoredPost[], entries: FeedEntry[], { deleteMissing
   }
 
   const active = stored.filter((p) => !p.deleted)
-  const removed = deleteMissing ? active.filter((p) => !unique.has(p.entryId)).map((p) => p.entryId) : []
+  const oldest = Math.min(...[...unique.values()].map((e) => e.published.getTime()))
+  const removed = deleteMissing
+    ? active.filter((p) => !unique.has(p.entryId) && new Date(p.published).getTime() >= oldest).map((p) => p.entryId)
+    : []
 
   if (removed.length * 2 > active.length) {
     throw new GuardError(`sync would delete ${removed.length} of ${active.length} posts; refusing`)

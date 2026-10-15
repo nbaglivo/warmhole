@@ -66,6 +66,10 @@ Without Docker: `mise install && npm ci && npm start`. Settings come from
 The first ping for a site saves the existing posts without sending them, so new
 followers aren't flooded.
 
+With `"deleteMissing": true`, a post that disappears from the feed is deleted
+for followers too. Posts older than the oldest entry in the feed are left
+alone, so feeds that list only the latest posts are safe.
+
 ## Check it works
 
 - `npx @fedify/cli lookup @you@your-site.dev` should show your actor.
