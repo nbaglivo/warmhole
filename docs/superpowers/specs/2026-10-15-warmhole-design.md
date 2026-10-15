@@ -68,7 +68,7 @@ restarts.
 | Table | Columns | Purpose |
 |---|---|---|
 | `keys` | `site_id`, `kind` (`RSASSA-PKCS1-v1_5` or `Ed25519`), `private_jwk`, `public_jwk` | Generated on first start per site. Config never holds keys. |
-| `followers` | `site_id`, `actor_id`, `inbox`, `shared_inbox`, `created_at`, `failing_since` | Delivery targets. PK `(site_id, actor_id)`. |
+| `followers` | `site_id`, `actor_id`, `inbox`, `shared_inbox`, `created_at` | Delivery targets. PK `(site_id, actor_id)`. |
 | `posts` | `site_id`, `entry_id`, `slug`, `title`, `summary`, `html`, `url`, `published`, `updated`, `content_hash`, `deleted_at`, `pending_activity` | What was sent; serves each Article at a stable URL independent of the feed. `pending_activity` (`Create`, `Update`, `Delete` or null) marks an activity saved but not yet handed to the queue. PK `(site_id, entry_id)`. |
 
 `content_hash` is a SHA-256 over `title`, `summary`, `html` and `url`.
@@ -90,7 +90,6 @@ All on `publicUrl`:
 | `/users/{siteId}/followers` | Fedify followers dispatcher (from `followers`) |
 | `/users/{siteId}/posts/{slug}` | Fedify object dispatcher (`Article` or `Tombstone`) |
 | `/.well-known/webfinger` | Hono (our own handler, see Discovery) |
-| `/.well-known/nodeinfo` | Fedify |
 | `POST /sites/{siteId}/sync` | Hono, bearer token |
 | `GET /sites/{siteId}/webfinger.json` | Hono, returns the static file the site should serve |
 | `GET /healthz` | Hono |
@@ -126,8 +125,9 @@ first.
 | Entry vs. `posts` | Result |
 |---|---|
 | Not stored | Insert; send `Create(Article)` |
-| Stored, `content_hash` changed | Update; send `Update(Article)` |
+| Stored, `content_hash` changed | Update; send `Update(Article)` (or keep `Create` if that was never handed to the queue) |
 | Stored, hash unchanged | Nothing |
+| Stored as deleted, back in the feed | Nothing (stays deleted; servers reject a `Create` for a deleted id) |
 | Stored, missing from feed, `deleteMissing: true` | Set `deleted_at`; send `Delete` (object becomes a `Tombstone`) |
 | Stored, missing from feed, `deleteMissing: false` (default) | Nothing |
 | First sync for a site (no stored posts) | Insert all; send nothing |
@@ -220,8 +220,10 @@ Other env: `PORT` (default 8080), `WARMHOLE_DB` (default `./data/warmhole.db`).
   return 401.
 - Feed fetch: 10 s timeout, 5 MB limit.
 - Bad inbox signatures rejected by Fedify; unhandled activities get 202.
-- Deliveries retry with backoff via Fedify's queue. A follower whose deliveries
-  have all failed for 7 days (`failing_since`) is removed.
+- Deliveries retry with backoff via Fedify's queue. When Fedify reports a
+  permanent failure for an inbox (404, 410, or its circuit breaker gives up),
+  every follower using that inbox or shared inbox is removed
+  (`setOutboxPermanentFailureHandler`).
 - Logging through LogTape (as Fedify does), JSON lines on stdout.
 
 ## Testing

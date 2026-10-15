@@ -423,7 +423,7 @@ pre { margin: 0; background: var(--tint); border-radius: 5px; padding: 14px 16px
         <li>Sync tokens are compared in constant time. A wrong token gets 401, and so does an unknown site id, so ids can't be probed.</li>
         <li>Feed fetches time out after 10 seconds and stop reading after 5 MB.</li>
         <li>Inbox requests with bad signatures are rejected by Fedify. Activities we don't handle get 202 and are dropped.</li>
-        <li>Deliveries retry with backoff through Fedify's queue. Followers whose servers keep failing for 7 days are removed.</li>
+        <li>Deliveries retry with backoff through Fedify's queue. When Fedify reports that an inbox is gone for good (404, 410, or too many failures), followers using it are removed.</li>
         <li>Logs use LogTape, which Fedify already uses, as JSON lines on stdout.</li>
       </ul>
     </div>
