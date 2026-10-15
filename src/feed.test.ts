@@ -102,6 +102,17 @@ test('throws FeedError on something that is not a feed', () => {
   assert.throws(() => normalizeFeed('', NOW), FeedError)
 })
 
+test('resolves relative entry urls against the feed url and skips unusable ones', () => {
+  const atom = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>t</title><id>urn:x</id><updated>2026-01-03T00:00:00Z</updated>
+    <entry><id>urn:rel</id><title>Relative</title><link href="/posts/a/"/><content type="html">&lt;img src="pic.png"&gt;</content></entry>
+    <entry><id>urn:bad</id><title>Not web</title><link href="mailto:me@x.dev"/><content type="html">x</content></entry>
+  </feed>`
+  const entries = normalizeFeed(atom, NOW, new URL('https://x.dev/feed.xml'))
+  assert.deepEqual(entries.map((e) => e.url), ['https://x.dev/posts/a/'])
+  assert.match(entries[0].html, /src="https:\/\/x\.dev\/posts\/a\/pic\.png"/)
+  assert.deepEqual(normalizeFeed(atom, NOW), [])
+})
+
 let server: Server
 const seen: { url: string; cacheControl: string | undefined }[] = []
 

@@ -43,7 +43,7 @@ export class Syncer {
     if (!site) throw new UnknownSiteError(`unknown site ${siteId}`)
 
     const fetchFeed = this.deps.fetchFeed ?? defaultFetchFeed
-    const entries = normalizeFeed(await fetchFeed(site.feedUrl))
+    const entries = normalizeFeed(await fetchFeed(site.feedUrl), new Date(), site.feedUrl)
     const stored = store.listPosts(siteId).map((p) => ({ entryId: p.entryId, contentHash: p.contentHash, deleted: p.deletedAt !== null }))
     const changes = diff(stored, entries, { deleteMissing: site.deleteMissing })
 

@@ -61,11 +61,19 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 `
 
+function safeDecode(segment: string): string {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
+
 export function slugFor(url: string, taken: Set<string>): string {
   const segments = new URL(url).pathname
     .split('/')
     .filter(Boolean)
-    .map((s) => decodeURIComponent(s).replace(/\.[a-z0-9]+$/i, ''))
+    .map((s) => safeDecode(s).replace(/\.[a-z0-9]+$/i, ''))
   const meaningful = segments.filter((s) => s.toLowerCase() !== 'index')
   const base =
     (meaningful.at(-1) ?? '')
