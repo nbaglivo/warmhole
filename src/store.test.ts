@@ -25,6 +25,7 @@ test('slugFor uses the last meaningful path segment', () => {
   assert.equal(slugFor('https://x.dev/', new Set()), 'post')
   assert.equal(slugFor('https://x.dev/a.html', new Set(['a'])), 'a-2')
   assert.equal(slugFor('https://x.dev/a.html', new Set(['a', 'a-2'])), 'a-3')
+  assert.equal(slugFor('https://blog.test/50%-off', new Set()), '50-off')
 })
 
 test('index.html posts get distinct slugs from their folders', () => {

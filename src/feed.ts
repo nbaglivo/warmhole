@@ -123,22 +123,33 @@ function fromJson(item: JsonItem): Draft {
   }
 }
 
-function finish(draft: Draft, now: Date): FeedEntry | undefined {
-  if (!draft.url) return undefined
+function webUrl(value: string | undefined, base: URL | undefined): string | undefined {
+  if (!value) return undefined
+  try {
+    const url = new URL(value, base)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function finish(draft: Draft, now: Date, base: URL | undefined): FeedEntry | undefined {
+  const url = webUrl(draft.url, base)
+  if (!url) return undefined
   const published = parseDate(draft.published) ?? parseDate(draft.updated) ?? now
   const updated = parseDate(draft.updated) ?? published
   return {
-    id: draft.id || draft.url,
-    url: draft.url,
-    title: draft.title?.trim() || draft.url,
+    id: draft.id || url,
+    url,
+    title: draft.title?.trim() || url,
     summary: draft.summary?.trim() || null,
-    html: absolutize(draft.html ?? '', draft.url),
+    html: absolutize(draft.html ?? '', url),
     published,
     updated,
   }
 }
 
-export function normalizeFeed(body: string, now: Date = new Date()): FeedEntry[] {
+export function normalizeFeed(body: string, now: Date = new Date(), base?: URL): FeedEntry[] {
   let parsed: ReturnType<typeof parseFeed>
   try {
     parsed = parseFeed(body)
@@ -157,7 +168,7 @@ export function normalizeFeed(body: string, now: Date = new Date()): FeedEntry[]
     throw new FeedError(`unsupported feed format: ${parsed.format}`)
   }
 
-  return drafts.map((d) => finish(d, now)).filter((e): e is FeedEntry => e !== undefined)
+  return drafts.map((d) => finish(d, now, base)).filter((e): e is FeedEntry => e !== undefined)
 }
 
 export async function fetchFeed(url: URL, { timeoutMs = 10_000, maxBytes = 5 * 1024 * 1024 }: FetchFeedOptions = {}): Promise<string> {
