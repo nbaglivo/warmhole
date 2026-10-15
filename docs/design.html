@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>warmhole design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap">
+<style>
+/* the blog's own look: warm paper, one quiet column of text, diagrams allowed to run wider */
+:root {
+  --bg: #faf8f4; --paper: #fffdf9; --fg: #38352f; --ink: #201e1a; --muted: #6f6a60; --faint: #8a857b;
+  --line: #d9d1c2; --rule: #ebe6dc; --tint: #f2ede2; --accent: #8b5a2b;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.7;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 4rem 5rem; }
+main { max-width: 1120px; margin: 0 auto; display: grid; gap: 3.5rem; }
+header, .prose { max-width: 42rem; width: 100%; margin: 0 auto; }
+h1 { margin: 0; font-weight: 300; font-size: 1.875rem; letter-spacing: -0.01em; line-height: 1.25; text-wrap: balance; }
+.sub { margin: .875rem 0 0; font-size: .9375rem; color: var(--muted); line-height: 1.6; }
+.meta { margin-top: 1.625rem; font-family: var(--mono); font-size: .78rem; color: var(--faint); }
+h2 { font-size: 1.5rem; font-weight: 500; letter-spacing: -0.015em; margin: 0 0 .5rem; color: var(--fg); text-wrap: balance; }
+h3 { font-size: 1.0625rem; font-weight: 500; margin: 0; color: var(--fg); }
+p { margin: 0; color: var(--muted); }
+code { font-family: var(--mono); font-size: .86em; color: var(--fg); }
+section { display: grid; gap: 2.25rem; padding-top: 2.5rem; border-top: 1px solid var(--rule); }
+figure { margin: 0; display: grid; gap: 1rem; min-width: 0; }
+figure > h3, figcaption { max-width: 42rem; width: 100%; margin: 0 auto; }
+figcaption { color: var(--muted); font-size: .9375rem; line-height: 1.65; }
+.scroll { overflow-x: auto; background: var(--paper); border: 1px solid var(--rule); border-radius: 5px; padding: 28px 24px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 28px; font-family: var(--mono); font-size: .78rem; color: var(--faint); max-width: 42rem; width: 100%; margin: 0 auto; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { display: inline-block; width: 28px; border-top: 1.5px solid var(--fg); }
+.legend i.d { border-top-style: dashed; }
+.legend i.a { border-top: 2px solid var(--accent); }
+
+.dg { display: block; width: 100%; height: auto; color: var(--fg); font-family: var(--sans); }
+.dg .box { fill: var(--paper); stroke: var(--line); stroke-width: 1.2; }
+.dg .box.acc { stroke: var(--accent); stroke-width: 1.8; }
+.dg .zonebox { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 4 5; }
+.dg .zone { fill: var(--faint); font-family: var(--mono); font-size: 12px; letter-spacing: .04em; }
+.dg .t { fill: var(--fg); font-size: 14px; font-weight: 500; }
+.dg .s { fill: var(--muted); font-size: 12px; }
+.dg .s2 { fill: var(--fg); font-size: 12.5px; }
+.dg .s3 { fill: var(--faint); font-size: 11px; }
+.dg .mono { font-family: var(--mono); }
+.dg .t.mono { font-weight: 500; font-size: 12.5px; }
+.dg .ln { stroke: var(--fg); stroke-width: 1.3; fill: none; }
+.dg .ln.acc { stroke: var(--accent); stroke-width: 1.8; }
+.dg .ln.dash { stroke-dasharray: 5 5; }
+.dg .mk { fill: var(--fg); }
+.dg .mk-acc { fill: var(--accent); }
+.dg .lb { fill: var(--fg); font-size: 12.5px; paint-order: stroke; stroke: var(--paper); stroke-width: 5px; stroke-linejoin: round; }
+.dg .lb.acc { fill: var(--accent); font-weight: 500; }
+.dg .s3 { paint-order: stroke; stroke: var(--paper); stroke-width: 5px; stroke-linejoin: round; }
+.dg .num { font-family: var(--mono); fill: var(--faint); }
+.dg .life { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 5; }
+.dg .note { fill: var(--tint); stroke: none; }
+
+.wide { max-width: 42rem; width: 100%; margin: 0 auto; display: grid; gap: 1rem; }
+.wide p, .wide li { color: var(--muted); }
+.wide strong { color: var(--fg); font-weight: 500; }
+ul { margin: 0; padding-left: 1.2rem; display: grid; gap: .4rem; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; vertical-align: top; padding: .55rem .75rem .55rem 0; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--mono); font-size: .75rem; font-weight: 400; color: var(--faint); }
+td { color: var(--muted); }
+td:first-child { color: var(--fg); white-space: nowrap; }
+pre { margin: 0; background: var(--tint); border-radius: 5px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: .8rem; line-height: 1.6; color: var(--fg); }
+.open { border-left: 2px solid var(--accent); padding-left: 1rem; }
+.open h3 { color: var(--accent); }
+</style>
+
+
+</head>
+<body>
+<main>
+  <header>
+    <h1>warmhole</h1>
+    <p class="sub">A warm little portal from your static site into the fediverse. A small Hono and Fedify server that turns a static site's feed into a fediverse account people can follow. You run your own copy, and one copy can serve a few sites.</p>
+    <div class="meta">design</div>
+  </header>
+
+  <section>
+    <div class="wide">
+      <h2>1. Components</h2>
+      <p>Everything runs in one container. The left column handles pings from your site, the right column handles messages from other servers, and both meet in SQLite.</p>
+    </div>
+    <div class="legend">
+      <span><i></i>request</span>
+      <span><i class="d"></i>response</span>
+      <span><i class="a"></i>signed ActivityPub traffic</span>
+    </div>
+    <figure>
+      <div class="scroll"><svg class="dg" viewBox="0 0 1100 670" style="min-width:960px" role="img" aria-label="Components: your CI pings the sync endpoint; the feed reader fetches feed.xml; the diff writes posts and enqueues activities in SQLite; Fedify routes receive follower requests and inbox listeners store followers; a delivery worker drains the queue and sends signed POSTs to follower servers.">
+<defs>
+    <marker id="d1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="d1-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-acc" d="M0 0L10 5L0 10z"/></marker>
+  </defs>
+<text class="zone" x="20" y="40">YOUR SITE</text>
+<text class="zone" x="310" y="40">SERVER CONTAINER · ap.nbaglivo.dev</text>
+<text class="zone" x="870" y="40">FEDIVERSE</text>
+<rect class="zonebox" x="20" y="55" width="240" height="595" rx="10"/>
+<rect class="zonebox" x="310" y="55" width="490" height="595" rx="10"/>
+<rect class="zonebox" x="870" y="55" width="210" height="595" rx="10"/>
+<rect class="box" x="40" y="90" width="200" height="56" rx="6"/>
+  <text class="t" x="140" y="115" text-anchor="middle">CI deploy</text>
+  <text class="s" x="140" y="133" text-anchor="middle">after pages deploy</text>
+<rect class="box" x="40" y="210" width="200" height="56" rx="6"/>
+  <text class="t mono" x="140" y="235" text-anchor="middle">feed.xml</text>
+  <text class="s" x="140" y="253" text-anchor="middle">RSS, Atom or JSON Feed</text>
+<rect class="box" x="40" y="450" width="200" height="56" rx="6"/>
+  <text class="t" x="140" y="475" text-anchor="middle">webfinger file</text>
+  <text class="s" x="140" y="493" text-anchor="middle">static, points to the server</text>
+<rect class="box" x="335" y="90" width="190" height="56" rx="6"/>
+  <text class="t" x="430" y="115" text-anchor="middle">Sync endpoint</text>
+  <text class="s" x="430" y="133" text-anchor="middle">POST /sites/:id/sync</text>
+<rect class="box" x="335" y="210" width="190" height="56" rx="6"/>
+  <text class="t" x="430" y="235" text-anchor="middle">Feed reader</text>
+  <text class="s" x="430" y="253" text-anchor="middle">fetch + normalize</text>
+<rect class="box" x="335" y="330" width="190" height="56" rx="6"/>
+  <text class="t" x="430" y="355" text-anchor="middle">Diff</text>
+  <text class="s" x="430" y="373" text-anchor="middle">pure function</text>
+<rect class="box acc" x="585" y="90" width="190" height="56" rx="6"/>
+  <text class="t" x="680" y="115" text-anchor="middle">Fedify routes</text>
+  <text class="s" x="680" y="133" text-anchor="middle">actor, inbox, outbox, posts</text>
+<rect class="box" x="585" y="210" width="190" height="56" rx="6"/>
+  <text class="t" x="680" y="235" text-anchor="middle">Inbox listeners</text>
+  <text class="s" x="680" y="253" text-anchor="middle">Follow, Undo, drop rest</text>
+<rect class="box" x="335" y="450" width="440" height="56" rx="6"/>
+  <text class="t" x="555" y="475" text-anchor="middle">SQLite · one file</text>
+  <text class="s" x="555" y="493" text-anchor="middle">keys · followers · posts · Fedify kv + queue</text>
+<rect class="box acc" x="585" y="570" width="190" height="56" rx="6"/>
+  <text class="t" x="680" y="595" text-anchor="middle">Delivery worker</text>
+  <text class="s" x="680" y="613" text-anchor="middle">Fedify queue, retries</text>
+<rect class="box" x="890" y="90" width="170" height="536" rx="6"/>
+<text class="t" x="975" y="118" text-anchor="middle">Follower servers</text>
+<text class="mono s2" x="975" y="146" text-anchor="middle">mastodon.social</text>
+<text class="mono s2" x="975" y="168" text-anchor="middle">pixelfed.social</text>
+<text class="mono s2" x="975" y="190" text-anchor="middle">and others</text>
+<line class="ln" x1="240" y1="118" x2="333" y2="118" marker-end="url(#d1-a)"/>
+<text class="lb" x="287" y="109" text-anchor="middle">ping</text>
+<line class="ln" x1="335" y1="238" x2="242" y2="238" marker-end="url(#d1-a)"/>
+<text class="lb" x="288" y="229" text-anchor="middle">GET</text>
+<line class="ln" x1="430" y1="146" x2="430" y2="208" marker-end="url(#d1-a)"/>
+<text class="lb" x="442" y="181" text-anchor="start">site id</text>
+<line class="ln" x1="430" y1="266" x2="430" y2="328" marker-end="url(#d1-a)"/>
+<text class="lb" x="442" y="301" text-anchor="start">entries</text>
+<line class="ln" x1="430" y1="386" x2="430" y2="448" marker-end="url(#d1-a)"/>
+<text class="lb" x="442" y="421" text-anchor="start">posts + enqueue</text>
+<line class="ln" x1="680" y1="146" x2="680" y2="208" marker-end="url(#d1-a)"/>
+<text class="lb" x="692" y="181" text-anchor="start">verified</text>
+<line class="ln" x1="680" y1="266" x2="680" y2="448" marker-end="url(#d1-a)"/>
+<text class="lb" x="692" y="352" text-anchor="start">followers +</text>
+<text class="lb" x="692" y="370" text-anchor="start">enqueue Accept</text>
+<line class="ln" x1="680" y1="506" x2="680" y2="568" marker-end="url(#d1-a)"/>
+<text class="lb" x="692" y="541" text-anchor="start">dequeue</text>
+<line class="ln acc" x1="890" y1="118" x2="777" y2="118" marker-end="url(#d1-b)"/>
+<text class="lb acc" x="833" y="109" text-anchor="middle">GET, POST</text>
+<line class="ln acc" x1="775" y1="598" x2="888" y2="598" marker-end="url(#d1-b)"/>
+<text class="lb acc" x="831" y="589" text-anchor="middle">POST</text>
+</svg></div>
+      <figcaption>Fedify's SQLite storage and queue share the same file as our tables, so a restart doesn't lose deliveries that are still waiting. Back up that file: it holds each site's private keys.</figcaption>
+    </figure>
+    <div class="wide tablewrap">
+      <table>
+        <tr><th>Unit</th><th>Does</th><th>Depends on</th></tr>
+        <tr><td><code>config</code></td><td>Loads and validates the sites file and reads tokens from env.</td><td>nothing</td></tr>
+        <tr><td><code>feed</code></td><td>Fetches a feed and turns RSS, Atom or JSON Feed into the same entry shape: id, url, title, summary, html, published, updated.</td><td>fetch, a feed parser</td></tr>
+        <tr><td><code>diff</code></td><td>Compares entries with stored posts and returns what to create, update and delete. Has no I/O.</td><td>nothing</td></tr>
+        <tr><td><code>store</code></td><td>Keys, followers and posts tables behind a small interface.</td><td><code>node:sqlite</code></td></tr>
+        <tr><td><code>federation</code></td><td>Fedify setup: actor, outbox, followers and post routes, inbox listeners, key pairs and sending.</td><td>Fedify, store</td></tr>
+        <tr><td><code>sync</code></td><td>Runs one sync for a site: feed, then diff, then store, then send.</td><td>feed, diff, store, federation</td></tr>
+        <tr><td><code>app</code></td><td>The Hono app: sync and health routes, with Fedify mounted as middleware.</td><td>everything above</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>2. Stored data</h2>
+      <p>Three tables of our own, plus Fedify's storage and queue tables in the same file.</p>
+    </div>
+    <div class="wide tablewrap">
+      <table>
+        <tr><th>Table</th><th>Columns</th><th>Why</th></tr>
+        <tr><td><code>keys</code></td><td>site_id, kind (RSA or Ed25519), private and public key</td><td>Created on first start. Config never holds keys.</td></tr>
+        <tr><td><code>followers</code></td><td>site_id, actor_id, inbox, shared_inbox, created_at</td><td>Who to deliver to. Deleted on <code>Undo(Follow)</code>.</td></tr>
+        <tr><td><code>posts</code></td><td>site_id, entry_id, slug, title, summary, html, url, published, updated, content_hash, deleted_at, pending_activity</td><td>Remembers what was sent, and serves each Article at its own URL even if the feed changes.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>3. Syncing a site</h2>
+      <p>The ping only answers once the feed has been read and the changes are saved. Delivery happens after the response, so a slow follower server never makes CI wait.</p>
+    </div>
+    <figure>
+      <div class="scroll"><svg class="dg" viewBox="0 0 1200 882" style="min-width:1040px" role="img" aria-label="Sync: CI pings the server, which fetches the feed without cache, diffs it against stored posts, saves changes and enqueues activities, answers CI with counts, then delivers in the background.">
+<defs>
+    <marker id="d2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="d2-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-acc" d="M0 0L10 5L0 10z"/></marker>
+  </defs>
+<line class="life" x1="120" y1="74" x2="120" y2="866"/>
+<rect class="box" x="25" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="120" y="44" text-anchor="middle">CI</text>
+  <text class="s" x="120" y="62" text-anchor="middle">deploy.yml</text>
+<line class="life" x1="360" y1="74" x2="360" y2="866"/>
+<rect class="box" x="265" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="360" y="44" text-anchor="middle">Server</text>
+  <text class="s" x="360" y="62" text-anchor="middle">sync + worker</text>
+<line class="life" x1="600" y1="74" x2="600" y2="866"/>
+<rect class="box" x="505" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="600" y="44" text-anchor="middle">Your site</text>
+  <text class="s" x="600" y="62" text-anchor="middle">feed.xml</text>
+<line class="life" x1="840" y1="74" x2="840" y2="866"/>
+<rect class="box" x="745" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="840" y="44" text-anchor="middle">SQLite</text>
+  <text class="s" x="840" y="62" text-anchor="middle">posts + queue</text>
+<line class="life" x1="1080" y1="74" x2="1080" y2="866"/>
+<rect class="box" x="985" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="1080" y="44" text-anchor="middle">Follower servers</text>
+  <text class="s" x="1080" y="62" text-anchor="middle">shared inboxes</text>
+<line class="ln" x1="124" y1="128" x2="354" y2="128" marker-end="url(#d2-a)"/>
+<text class="lb" x="240" y="119" text-anchor="middle"><tspan class="num">1</tspan>  POST /sites/inner-monologue/sync</text>
+<text class="mono s3" x="240" y="146" text-anchor="middle">Authorization: Bearer &lt;token&gt;</text>
+<line class="ln" x1="364" y1="192" x2="594" y2="192" marker-end="url(#d2-a)"/>
+<text class="lb" x="480" y="183" text-anchor="middle"><tspan class="num">2</tspan>  GET /feed.xml?_=&lt;timestamp&gt;</text>
+<text class="mono s3" x="480" y="210" text-anchor="middle">Cache-Control: no-cache</text>
+<line class="ln dash" x1="596" y1="256" x2="366" y2="256" marker-end="url(#d2-a)"/>
+<text class="lb" x="480" y="247" text-anchor="middle"><tspan class="num">3</tspan>  every entry in the feed</text>
+<rect class="note" x="250" y="303" width="220" height="34" rx="4"/>
+<text class="s2" x="360" y="324" text-anchor="middle">parse, normalize, run guards</text>
+<line class="ln" x1="364" y1="384" x2="834" y2="384" marker-end="url(#d2-a)"/>
+<text class="lb" x="600" y="375" text-anchor="middle"><tspan class="num">4</tspan>  read stored posts for site</text>
+<rect class="note" x="250" y="431" width="220" height="34" rx="4"/>
+<text class="s2" x="360" y="452" text-anchor="middle">diff: 1 new, 0 changed, 0 gone</text>
+<line class="ln" x1="364" y1="512" x2="834" y2="512" marker-end="url(#d2-a)"/>
+<text class="lb" x="600" y="503" text-anchor="middle"><tspan class="num">5</tspan>  save posts, mark Create pending</text>
+<text class="mono s3" x="600" y="530" text-anchor="middle">one transaction</text>
+<line class="ln" x1="364" y1="576" x2="834" y2="576" marker-end="url(#d2-a)"/>
+<text class="lb" x="600" y="567" text-anchor="middle"><tspan class="num">6</tspan>  enqueue Create, clear pending</text>
+<line class="ln dash" x1="356" y1="640" x2="126" y2="640" marker-end="url(#d2-a)"/>
+<text class="lb" x="240" y="631" text-anchor="middle"><tspan class="num">7</tspan>  200 { new: 1, updated: 0, deleted: 0 }</text>
+<rect class="note" x="250" y="687" width="700" height="34" rx="4"/>
+<text class="s2" x="600" y="708" text-anchor="middle">later, in the background</text>
+<line class="ln dash" x1="836" y1="768" x2="366" y2="768" marker-end="url(#d2-a)"/>
+<text class="lb" x="600" y="759" text-anchor="middle"><tspan class="num">8</tspan>  dequeue Create(Article)</text>
+<line class="ln acc" x1="364" y1="832" x2="1074" y2="832" marker-end="url(#d2-b)"/>
+<text class="lb acc" x="720" y="823" text-anchor="middle"><tspan class="num">9</tspan>  signed POST Create(Article)</text>
+<text class="mono s3" x="720" y="850" text-anchor="middle">per shared inbox, retried</text>
+</svg></div>
+      <figcaption>Two pings for the same site never run at the same time; the second waits for the first. Pinging again with nothing new returns all zeros.</figcaption>
+    </figure>
+    <div class="wide tablewrap">
+      <table>
+        <tr><th>Entry in feed vs. posts table</th><th>Result</th></tr>
+        <tr><td>Not stored yet</td><td>Save it and send <code>Create(Article)</code></td></tr>
+        <tr><td>Stored, content hash changed</td><td>Update it and send <code>Update(Article)</code></td></tr>
+        <tr><td>Stored, hash unchanged</td><td>Nothing</td></tr>
+        <tr><td>Stored, gone from the feed</td><td>Mark deleted and send <code>Delete</code>, only if the site sets <code>deleteMissing</code>. Off by default, because many feeds only list recent posts.</td></tr>
+        <tr><td>First sync of a new site</td><td>Save everything and send nothing, so existing posts don't flood followers' timelines.</td></tr>
+      </table>
+    </div>
+    <div class="wide">
+      <p><strong>Guards that stop a sync before it changes anything:</strong> the feed can't be fetched or parsed (502), the feed has no entries (422), or the feed would delete more than half the stored posts (422). The last one catches a broken build that publishes an almost empty feed.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>4. Following</h2>
+      <p>Fedify checks every incoming signature before our code runs. Our listener only stores or removes a follower and asks Fedify to send the reply.</p>
+    </div>
+    <figure>
+      <div class="scroll"><svg class="dg" viewBox="0 0 1100 626" style="min-width:940px" role="img" aria-label="Follow: a signed Follow reaches the Fedify inbox, Fedify verifies the signature, the listener stores the follower and enqueues an Accept, which the worker sends.">
+<defs>
+    <marker id="d3-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="d3-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-acc" d="M0 0L10 5L0 10z"/></marker>
+  </defs>
+<line class="life" x1="130" y1="74" x2="130" y2="610"/>
+<rect class="box" x="35" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="130" y="44" text-anchor="middle">Reader</text>
+  <text class="s" x="130" y="62" text-anchor="middle">Mastodon app</text>
+<line class="life" x1="410" y1="74" x2="410" y2="610"/>
+<rect class="box" x="315" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="410" y="44" text-anchor="middle">mastodon.social</text>
+  <text class="s" x="410" y="62" text-anchor="middle">reader's server</text>
+<line class="life" x1="690" y1="74" x2="690" y2="610"/>
+<rect class="box" x="595" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="690" y="44" text-anchor="middle">Server</text>
+  <text class="s" x="690" y="62" text-anchor="middle">Fedify + listener</text>
+<line class="life" x1="970" y1="74" x2="970" y2="610"/>
+<rect class="box" x="875" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="970" y="44" text-anchor="middle">SQLite</text>
+  <text class="s" x="970" y="62" text-anchor="middle">followers + queue</text>
+<line class="ln" x1="134" y1="128" x2="404" y2="128" marker-end="url(#d3-a)"/>
+<text class="lb" x="270" y="119" text-anchor="middle"><tspan class="num">1</tspan>  click Follow</text>
+<line class="ln acc" x1="414" y1="192" x2="684" y2="192" marker-end="url(#d3-b)"/>
+<text class="lb acc" x="550" y="183" text-anchor="middle"><tspan class="num">2</tspan>  signed POST Follow</text>
+<text class="mono s3" x="550" y="210" text-anchor="middle">/users/inner-monologue/inbox</text>
+<line class="ln" x1="686" y1="256" x2="416" y2="256" marker-end="url(#d3-a)"/>
+<text class="lb" x="550" y="247" text-anchor="middle"><tspan class="num">3</tspan>  GET their actor</text>
+<text class="mono s3" x="550" y="274" text-anchor="middle">Fedify fetches the key</text>
+<line class="ln dash" x1="414" y1="320" x2="684" y2="320" marker-end="url(#d3-a)"/>
+<text class="lb" x="550" y="311" text-anchor="middle"><tspan class="num">4</tspan>  Person + publicKey</text>
+<rect class="note" x="580" y="367" width="220" height="34" rx="4"/>
+<text class="s2" x="690" y="388" text-anchor="middle">signature ok, call listener</text>
+<line class="ln" x1="694" y1="448" x2="964" y2="448" marker-end="url(#d3-a)"/>
+<text class="lb" x="830" y="439" text-anchor="middle"><tspan class="num">5</tspan>  insert follower, enqueue Accept</text>
+<text class="mono s3" x="830" y="466" text-anchor="middle">actor, inbox, shared inbox</text>
+<line class="ln acc" x1="686" y1="512" x2="416" y2="512" marker-end="url(#d3-b)"/>
+<text class="lb acc" x="550" y="503" text-anchor="middle"><tspan class="num">6</tspan>  signed POST Accept(Follow)</text>
+<text class="mono s3" x="550" y="530" text-anchor="middle">sent by the worker</text>
+<line class="ln dash" x1="406" y1="576" x2="136" y2="576" marker-end="url(#d3-a)"/>
+<text class="lb" x="270" y="567" text-anchor="middle"><tspan class="num">7</tspan>  now following</text>
+</svg></div>
+      <figcaption>Fedify also builds the followers collection from the table, and it uses shared inboxes, so 50 followers on one server cost one delivery.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>5. Discovery across two domains</h2>
+      <p>WebFinger on the server is a small route of our own, not Fedify's. Your site answers one question: which actor does the handle belong to? The server answers the same question the other way round, so Mastodon trusts the handle wherever it first sees the account.</p>
+    </div>
+    <figure>
+      <div class="scroll"><svg class="dg" viewBox="0 0 1000 754" style="min-width:840px" role="img" aria-label="Discovery with two domains: Mastodon resolves the handle on your site, which points to the actor on the server; when it starts from the actor instead, the server WebFinger names your site domain and Mastodon confirms it there.">
+<defs>
+    <marker id="d4-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk" d="M0 0L10 5L0 10z"/></marker>
+    <marker id="d4-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="mk-acc" d="M0 0L10 5L0 10z"/></marker>
+  </defs>
+<line class="life" x1="150" y1="74" x2="150" y2="738"/>
+<rect class="box" x="55" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="150" y="44" text-anchor="middle">mastodon.social</text>
+  <text class="s" x="150" y="62" text-anchor="middle">reader's server</text>
+<line class="life" x1="500" y1="74" x2="500" y2="738"/>
+<rect class="box" x="405" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="500" y="44" text-anchor="middle">Your site</text>
+  <text class="s" x="500" y="62" text-anchor="middle">innermonologue.nbaglivo.dev</text>
+<line class="life" x1="850" y1="74" x2="850" y2="738"/>
+<rect class="box" x="755" y="20" width="190" height="54" rx="6"/>
+  <text class="t" x="850" y="44" text-anchor="middle">Server</text>
+  <text class="s" x="850" y="62" text-anchor="middle">ap.nbaglivo.dev</text>
+<rect class="note" x="40" y="111" width="220" height="34" rx="4"/>
+<text class="s2" x="150" y="132" text-anchor="middle">someone searches the handle</text>
+<line class="ln" x1="154" y1="192" x2="494" y2="192" marker-end="url(#d4-a)"/>
+<text class="lb" x="325" y="183" text-anchor="middle"><tspan class="num">1</tspan>  GET /.well-known/webfinger</text>
+<text class="mono s3" x="325" y="210" text-anchor="middle">acct:nico@innermonologue.nbaglivo.dev</text>
+<line class="ln dash" x1="496" y1="256" x2="156" y2="256" marker-end="url(#d4-a)"/>
+<text class="lb" x="325" y="247" text-anchor="middle"><tspan class="num">2</tspan>  self → ap.nbaglivo.dev/users/inner-monologue</text>
+<line class="ln" x1="154" y1="320" x2="844" y2="320" marker-end="url(#d4-a)"/>
+<text class="lb" x="500" y="311" text-anchor="middle"><tspan class="num">3</tspan>  GET /users/inner-monologue</text>
+<line class="ln dash" x1="846" y1="384" x2="156" y2="384" marker-end="url(#d4-a)"/>
+<text class="lb" x="500" y="375" text-anchor="middle"><tspan class="num">4</tspan>  Person: nico, inbox, publicKey</text>
+<rect class="note" x="40" y="431" width="220" height="34" rx="4"/>
+<text class="s2" x="150" y="452" text-anchor="middle">or: it sees a boost first</text>
+<line class="ln" x1="154" y1="512" x2="844" y2="512" marker-end="url(#d4-a)"/>
+<text class="lb" x="500" y="503" text-anchor="middle"><tspan class="num">5</tspan>  GET /.well-known/webfinger</text>
+<text class="mono s3" x="500" y="530" text-anchor="middle">acct:nico@ap.nbaglivo.dev</text>
+<line class="ln dash" x1="846" y1="576" x2="156" y2="576" marker-end="url(#d4-a)"/>
+<text class="lb" x="500" y="567" text-anchor="middle"><tspan class="num">6</tspan>  subject: acct:nico@innermonologue…</text>
+<line class="ln" x1="154" y1="640" x2="494" y2="640" marker-end="url(#d4-a)"/>
+<text class="lb" x="325" y="631" text-anchor="middle"><tspan class="num">7</tspan>  GET /.well-known/webfinger</text>
+<text class="mono s3" x="325" y="658" text-anchor="middle">confirm it points back</text>
+<rect class="note" x="40" y="687" width="220" height="34" rx="4"/>
+<text class="s2" x="150" y="708" text-anchor="middle">shows @nico@innermonologue.nbaglivo.dev</text>
+</svg></div>
+      <figcaption>Steps 5 to 7 only happen when Mastodon meets the actor before the handle, for example through a boost. Both answers have to agree, or Mastodon shows the account as <code>@nico@ap.nbaglivo.dev</code>.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>6. Configuration and site setup</h2>
+      <p>One JSON file for the server, with secrets kept in env. Each site needs two small additions.</p>
+      <pre>{
+  "publicUrl": "https://ap.nbaglivo.dev",
+  "sites": [
+    {
+      "id": "inner-monologue",
+      "handle": "nico",
+      "domain": "innermonologue.nbaglivo.dev",
+      "feedUrl": "https://innermonologue.nbaglivo.dev/feed.xml",
+      "name": "The Open Inner Monologue",
+      "summary": "The open inner monologue of Nicolás Baglivo.",
+      "icon": "https://innermonologue.nbaglivo.dev/public/icons/avatar.png",
+      "syncTokenEnv": "INNER_MONOLOGUE_SYNC_TOKEN",
+      "deleteMissing": true
+    }
+  ]
+}</pre>
+      <p><strong>On the site:</strong> a static <code>/.well-known/webfinger</code> file, served as <code>application/jrd+json</code>. The server prints this file for each site on request (<code>GET /sites/:id/webfinger.json</code>), so nobody writes it by hand.</p>
+      <pre>{
+  "subject": "acct:nico@innermonologue.nbaglivo.dev",
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/activity+json",
+      "href": "https://ap.nbaglivo.dev/users/inner-monologue"
+    }
+  ]
+}</pre>
+      <p><strong>In CI:</strong> one step after deploy.</p>
+      <pre>- name: Notify fediverse server
+  run: &gt;
+    curl --fail --retry 3 -X POST
+    -H "Authorization: Bearer ${{ secrets.FEDI_SYNC_TOKEN }}"
+    https://ap.nbaglivo.dev/sites/inner-monologue/sync</pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>7. Errors and safety</h2>
+      <ul>
+        <li>Sync tokens are compared in constant time. A wrong token gets 401, and so does an unknown site id, so ids can't be probed.</li>
+        <li>Feed fetches time out after 10 seconds and stop reading after 5 MB.</li>
+        <li>Inbox requests with bad signatures are rejected by Fedify. Activities we don't handle get 202 and are dropped.</li>
+        <li>Deliveries retry with backoff through Fedify's queue. Followers whose servers keep failing for 7 days are removed.</li>
+        <li>Logs use LogTape, which Fedify already uses, as JSON lines on stdout.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>8. Testing</h2>
+      <ul>
+        <li><strong>Unit:</strong> feed normalizing against real RSS, Atom and JSON Feed samples, including your <code>feed.xml</code>; every row of the diff table and every guard; config validation.</li>
+        <li><strong>Integration:</strong> the Hono app with SQLite in memory. Ping it with a local feed, then check the stored posts, the queued activities and the HTTP responses. A fake follower server checks that signed deliveries arrive.</li>
+        <li><strong>By hand before release:</strong> <code>fedify lookup</code> on the actor, <code>fedify inbox</code> as a throwaway follower, then a real follow from a test Mastodon account.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>9. Repository and stack</h2>
+      <ul>
+        <li>The written spec lives next to this page, in <code>docs/superpowers/specs/2026-10-15-warmhole-design.md</code>.</li>
+        <li>TypeScript, run directly by Node 26 with no build step. Tests with <code>node:test</code>. Node version pinned in <code>mise.toml</code>.</li>
+        <li>Dependencies: <code>hono</code>, <code>@hono/node-server</code>, <code>@fedify/fedify</code>, <code>@fedify/hono</code>, <code>@fedify/sqlite</code> and a feed parser.</li>
+        <li>A <code>Dockerfile</code> based on <code>node:26-slim</code>, with SQLite on a mounted volume.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="wide">
+      <h2>10. What changed after checking Fedify</h2>
+      <ul>
+        <li><strong>WebFinger is our own handler.</strong> Fedify's built-in WebFinger uses one handle domain for the whole server, so it can't answer with a different domain per site. A small Hono route answers instead, before Fedify.</li>
+        <li><strong>Handles are unique per server.</strong> When Mastodon meets the actor first, it asks the server about <code>nico@ap.nbaglivo.dev</code>, and that has to name exactly one site. The config check rejects duplicate handles.</li>
+        <li><strong>Sends are marked pending first.</strong> Fedify's queue can't join our database transaction, so each changed post is saved with a pending activity, handed to the queue, then cleared. A crash in between is finished by the next ping.</li>
+      </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+</body>
+</html>

@@ -6,7 +6,7 @@ warmhole is a small, self-hosted Hono + Fedify server that turns a static site's
 feed into a fediverse account people can follow from Mastodon and other
 ActivityPub software. One instance can serve a few sites.
 
-Visual version of this design (diagrams): https://claude.ai/artifact/JVkjHvMQCi6GpriY4NiSMa
+Visual version of this design, with diagrams: [`docs/design.html`](../../design.html).
 
 ## Goal and success criteria
 
@@ -69,7 +69,7 @@ restarts.
 |---|---|---|
 | `keys` | `site_id`, `kind` (`RSASSA-PKCS1-v1_5` or `Ed25519`), `private_jwk`, `public_jwk` | Generated on first start per site. Config never holds keys. |
 | `followers` | `site_id`, `actor_id`, `inbox`, `shared_inbox`, `created_at`, `failing_since` | Delivery targets. PK `(site_id, actor_id)`. |
-| `posts` | `site_id`, `entry_id`, `slug`, `title`, `summary`, `html`, `url`, `published`, `updated`, `content_hash`, `deleted_at` | What was sent; serves each Article at a stable URL independent of the feed. PK `(site_id, entry_id)`. |
+| `posts` | `site_id`, `entry_id`, `slug`, `title`, `summary`, `html`, `url`, `published`, `updated`, `content_hash`, `deleted_at`, `pending_activity` | What was sent; serves each Article at a stable URL independent of the feed. `pending_activity` (`Create`, `Update`, `Delete` or null) marks an activity saved but not yet handed to the queue. PK `(site_id, entry_id)`. |
 
 `content_hash` is a SHA-256 over `title`, `summary`, `html` and `url`.
 `slug` is derived from the entry URL's last path segment (extension removed),
@@ -89,13 +89,14 @@ All on `publicUrl`:
 | `/users/{siteId}/outbox` | Fedify outbox dispatcher (from `posts`, newest first, paged) |
 | `/users/{siteId}/followers` | Fedify followers dispatcher (from `followers`) |
 | `/users/{siteId}/posts/{slug}` | Fedify object dispatcher (`Article` or `Tombstone`) |
-| `/.well-known/webfinger`, `/.well-known/nodeinfo` | Fedify |
+| `/.well-known/webfinger` | Hono (our own handler, see Discovery) |
+| `/.well-known/nodeinfo` | Fedify |
 | `POST /sites/{siteId}/sync` | Hono, bearer token |
 | `GET /sites/{siteId}/webfinger.json` | Hono, returns the static file the site should serve |
 | `GET /healthz` | Hono |
 
-The actor identifier is the site id, not the handle, so two sites may share a
-handle on different domains.
+The actor identifier is the site id. Handles must be unique within one
+instance (see Discovery).
 
 ## Sync
 
@@ -105,10 +106,17 @@ handle on different domains.
 3. Parse and normalize entries.
 4. Run guards (below). If any trips, respond with an error and change nothing.
 5. Diff against stored posts.
-6. In one transaction: write post changes and enqueue activities
-   (`ctx.sendActivity(..., "followers", ..., { preferSharedInbox: true })`).
-7. Respond `200 { "new": n, "updated": n, "deleted": n }`.
-8. Fedify's queue delivers in the background, with retries.
+6. In one transaction: write post changes, each with `pending_activity` set.
+7. For every post with a `pending_activity` (including any left over from an
+   earlier sync that crashed), hand the activity to Fedify
+   (`ctx.sendActivity(..., "followers", ..., { preferSharedInbox: true })`),
+   then clear the flag.
+8. Respond `200 { "new": n, "updated": n, "deleted": n }`.
+9. Fedify's queue delivers in the background, with retries.
+
+Fedify's queue can't join our transaction, because `sendActivity` is async.
+The pending flag makes the hand-off safe to retry: a crash between steps 6 and
+7 is finished by the next sync.
 
 Two syncs for the same site never run concurrently; the second waits for the
 first.
@@ -147,17 +155,20 @@ first.
 - The site serves `/.well-known/webfinger` as a static file
   (`application/jrd+json`): subject `acct:{handle}@{domain}`, `self` link to
   `{publicUrl}/users/{siteId}`.
-- The server's own WebFinger answers `acct:{handle}@{serverHost}` and the actor
-  URL with subject `acct:{handle}@{domain}`, so Mastodon resolves the site
-  handle even when it meets the actor first (e.g. via a boost) and confirms it
-  against the site's file.
+- The server's own WebFinger answers `acct:{handle}@{serverHost}`,
+  `acct:{handle}@{domain}` and the actor URL with subject
+  `acct:{handle}@{domain}`, so Mastodon resolves the site handle even when it
+  meets the actor first (e.g. via a boost) and confirms it against the site's
+  file.
 - If the two answers disagree, Mastodon falls back to showing
   `@{handle}@{serverHost}`.
-
-**To verify first during planning:** Fedify's option for serving handles on a
-different host than the actor is set once per `Federation` instance. With
-several sites on different domains, choose between one `Federation` per site
-(sharing the KV store and queue) or a custom WebFinger handler for our routes.
+- When Mastodon meets the actor first, it looks up
+  `acct:{preferredUsername}@{serverHost}`. That lookup must name exactly one
+  site, so **handles are unique within an instance** and config validation
+  rejects duplicates.
+- WebFinger is our own Hono handler, mounted before Fedify. Fedify's built-in
+  WebFinger uses a single `handleHost` for the whole instance, which can't
+  return a different subject domain per site.
 
 ## Configuration
 
@@ -184,6 +195,7 @@ are referenced by env var name, never stored in the file.
 ```
 
 Validation fails startup on: missing required fields, duplicate site ids,
+duplicate handles,
 non-HTTPS URLs, or a `syncTokenEnv` that is unset.
 
 Other env: `PORT` (default 8080), `WARMHOLE_DB` (default `./data/warmhole.db`).
