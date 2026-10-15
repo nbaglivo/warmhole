@@ -1,0 +1,128 @@
+import { test, before, after } from 'node:test'
+import assert from 'node:assert/strict'
+import { DatabaseSync } from 'node:sqlite'
+import { MemoryKvStore } from '@fedify/fedify'
+import { Store } from './store.ts'
+import { buildFederation } from './federation.ts'
+import { Syncer, UnknownSiteError } from './sync.ts'
+import { FeedError, type FeedEntry } from './feed.ts'
+import { GuardError } from './diff.ts'
+import { startFakeRemote, TEST_CONFIG, type FakeRemote } from '../test/fake-remote.ts'
+import { entry, rss } from '../test/feeds.ts'
+
+let remote: FakeRemote
+before(async () => {
+  remote = await startFakeRemote()
+})
+after(() => remote.close())
+
+function setup() {
+  const store = new Store(new DatabaseSync(':memory:'))
+  store.migrate()
+  const federation = buildFederation({ config: TEST_CONFIG, store, kv: new MemoryKvStore(), allowPrivateAddress: true, skipSignatureVerification: true })
+  let feed: FeedEntry[] = []
+  const syncer = new Syncer({ config: TEST_CONFIG, store, federation, fetchFeed: async () => rss(feed) })
+  store.addFollower('inner-monologue', { actorId: remote.actorId, inbox: remote.inbox, sharedInbox: remote.sharedInbox })
+  return { store, syncer, setFeed: (entries: FeedEntry[]) => (feed = entries) }
+}
+
+function deliveredTypes(since: number): string[] {
+  return remote.deliveries.slice(since).map((d) => d.type)
+}
+
+test('first sync stores silently, then new posts are delivered', async () => {
+  const { syncer, setFeed } = setup()
+  const start = remote.deliveries.length
+
+  setFeed([entry('a'), entry('b')])
+  assert.deepEqual(await syncer.sync('inner-monologue'), { new: 2, updated: 0, deleted: 0 })
+  assert.deepEqual(deliveredTypes(start), [])
+
+  setFeed([entry('a'), entry('b'), entry('c')])
+  assert.deepEqual(await syncer.sync('inner-monologue'), { new: 1, updated: 0, deleted: 0 })
+  const delivered = remote.deliveries.slice(start)
+  assert.deepEqual(delivered.map((d) => d.type), ['Create'])
+  assert.equal(delivered[0].path, '/inbox')
+  assert.equal((delivered[0].body.object as Record<string, unknown>).name, 'Title c')
+})
+
+test('re-sync with nothing new returns zeros and sends nothing', async () => {
+  const { syncer, setFeed } = setup()
+  setFeed([entry('a')])
+  await syncer.sync('inner-monologue')
+  const start = remote.deliveries.length
+  assert.deepEqual(await syncer.sync('inner-monologue'), { new: 0, updated: 0, deleted: 0 })
+  assert.deepEqual(deliveredTypes(start), [])
+})
+
+test('edits send Update and removals send Delete', async () => {
+  const { syncer, setFeed } = setup()
+  setFeed([entry('a'), entry('b'), entry('c')])
+  await syncer.sync('inner-monologue')
+  const start = remote.deliveries.length
+
+  setFeed([entry('a', { title: 'Edited' }), entry('b')])
+  assert.deepEqual(await syncer.sync('inner-monologue'), { new: 0, updated: 1, deleted: 1 })
+  assert.deepEqual(deliveredTypes(start).sort(), ['Delete', 'Update'])
+})
+
+test('guards and feed errors change nothing', async () => {
+  const { store, syncer, setFeed } = setup()
+  setFeed([entry('a'), entry('b')])
+  await syncer.sync('inner-monologue')
+
+  setFeed([])
+  await assert.rejects(syncer.sync('inner-monologue'), GuardError)
+  assert.equal(store.countPublishedPosts('inner-monologue'), 2)
+
+  const broken = new Syncer({
+    config: TEST_CONFIG,
+    store,
+    federation: buildFederation({ config: TEST_CONFIG, store, kv: new MemoryKvStore() }),
+    fetchFeed: async () => {
+      throw new FeedError('down')
+    },
+  })
+  await assert.rejects(broken.sync('inner-monologue'), FeedError)
+})
+
+test('unknown site is rejected', async () => {
+  const { syncer } = setup()
+  await assert.rejects(syncer.sync('nope'), UnknownSiteError)
+})
+
+test('pending activities left by a crash are sent on the next sync', async () => {
+  const { store, syncer, setFeed } = setup()
+  setFeed([entry('a')])
+  await syncer.sync('inner-monologue')
+  store.applyChanges('inner-monologue', { create: [entry('z')], update: [], delete: [], silent: false })
+  const start = remote.deliveries.length
+
+  setFeed([entry('a'), entry('z')])
+  assert.deepEqual(await syncer.sync('inner-monologue'), { new: 0, updated: 0, deleted: 0 })
+  assert.deepEqual(deliveredTypes(start), ['Create'])
+  assert.deepEqual(store.listPending('inner-monologue'), [])
+})
+
+test('syncs for the same site never overlap', async () => {
+  const store = new Store(new DatabaseSync(':memory:'))
+  store.migrate()
+  const federation = buildFederation({ config: TEST_CONFIG, store, kv: new MemoryKvStore() })
+  let running = 0
+  let maxRunning = 0
+  const syncer = new Syncer({
+    config: TEST_CONFIG,
+    store,
+    federation,
+    fetchFeed: async () => {
+      running++
+      maxRunning = Math.max(maxRunning, running)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      running--
+      return rss([entry('a')])
+    },
+  })
+  const results = await Promise.all([syncer.sync('inner-monologue'), syncer.sync('inner-monologue'), syncer.sync('inner-monologue')])
+  assert.equal(maxRunning, 1)
+  assert.deepEqual(results.map((r) => r.new), [1, 0, 0])
+})
