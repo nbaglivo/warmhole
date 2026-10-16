@@ -90,6 +90,27 @@ alone, so feeds that list only the latest posts are safe.
 - `npx @fedify/cli inbox` gives you a throwaway account to follow from.
 - Then follow from a real Mastodon account, publish a post and ping.
 
+## Watch what it does
+
+warmhole logs one JSON line per event: each sync and what it found, each
+follow and unfollow, each delivery and any follower it gave up on.
+`scripts/logs` reads them over SSH and prints them one short line each:
+
+```bash
+export WARMHOLE_SSH=root@203.0.113.7
+scripts/logs              # last 200 lines
+scripts/logs -f           # follow live
+scripts/logs --since 1h
+```
+
+```
+12:43:48 synced inner-monologue: 1 new, 0 updated, 0 deleted
+12:43:49 sent Create creating-a-life → mastodon.social
+```
+
+`WARMHOLE_SSH_KEY` picks an SSH key and `WARMHOLE_DIR` the folder on the server
+(default `/opt/warmhole`).
+
 ## Development
 
 ```bash
