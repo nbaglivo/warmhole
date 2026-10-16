@@ -25,10 +25,12 @@ import {
   type Activity,
   type Recipient,
 } from '@fedify/vocab'
+import { getLogger } from '@logtape/logtape'
 import type { Config } from './config.ts'
-import type { PendingActivity, PostRow, Store, StoredKey } from './store.ts'
+import type { Follower, PendingActivity, PostRow, Store, StoredKey } from './store.ts'
 
 const PAGE_SIZE = 20
+const logger = getLogger(['warmhole', 'followers'])
 
 export type FederationDeps = {
   config: Config
@@ -74,6 +76,14 @@ async function generateKeys(): Promise<StoredKey[]> {
     { kind: 'rsa', privateJwk: await exportJwk(rsa.privateKey), publicJwk: await exportJwk(rsa.publicKey) },
     { kind: 'ed25519', privateJwk: await exportJwk(ed.privateKey), publicJwk: await exportJwk(ed.publicKey) },
   ]
+}
+
+function recipients(followers: Follower[]): Recipient[] {
+  return followers.map((f) => ({
+    id: new URL(f.actorId),
+    inboxId: new URL(f.inbox),
+    endpoints: f.sharedInbox ? { sharedInbox: new URL(f.sharedInbox) } : null,
+  }))
 }
 
 function nextCursor(offset: number, total: number): string | null {
@@ -140,13 +150,10 @@ export function buildFederation({ config, store, kv, queue, allowPrivateAddress 
 
   federation
     .setFollowersDispatcher('/users/{identifier}/followers', (_ctx, identifier, cursor) => {
-      if (!sites.has(identifier) || cursor === null) return null
+      if (!sites.has(identifier)) return null
+      if (cursor === null) return { items: recipients(store.listFollowers(identifier, { offset: 0, limit: -1 })) }
       const offset = Number(cursor) || 0
-      const items: Recipient[] = store.listFollowers(identifier, { offset, limit: PAGE_SIZE }).map((f) => ({
-        id: new URL(f.actorId),
-        inboxId: new URL(f.inbox),
-        endpoints: f.sharedInbox ? { sharedInbox: new URL(f.sharedInbox) } : null,
-      }))
+      const items = recipients(store.listFollowers(identifier, { offset, limit: PAGE_SIZE }))
       return { items, nextCursor: nextCursor(offset, store.countFollowers(identifier)) }
     })
     .setCounter((_ctx, identifier) => (sites.has(identifier) ? store.countFollowers(identifier) : null))
@@ -174,6 +181,7 @@ export function buildFederation({ config, store, kv, queue, allowPrivateAddress 
         inbox: follower.inboxId.href,
         sharedInbox: follower.endpoints?.sharedInbox?.href ?? null,
       })
+      logger.info('{follower} followed {site}', { follower: follower.id.href, site: parsed.identifier })
       await ctx.sendActivity(
         { identifier: parsed.identifier },
         follower,
@@ -190,10 +198,12 @@ export function buildFederation({ config, store, kv, queue, allowPrivateAddress 
       const parsed = ctx.parseUri(object.objectId)
       if (parsed?.type !== 'actor' || !sites.has(parsed.identifier)) return
       store.removeFollower(parsed.identifier, undo.actorId.href)
+      logger.info('{follower} unfollowed {site}', { follower: undo.actorId.href, site: parsed.identifier })
     })
 
-  federation.setOutboxPermanentFailureHandler((_ctx, { inbox }) => {
-    store.removeFollowersByInbox(inbox.href)
+  federation.setOutboxPermanentFailureHandler((_ctx, { inbox, reason, statusCode }) => {
+    const count = store.removeFollowersByInbox(inbox.href)
+    logger.warn('removed {count} followers at {inbox} after delivery failed for good ({reason})', { count, inbox: inbox.href, reason, statusCode })
   })
 
   return federation

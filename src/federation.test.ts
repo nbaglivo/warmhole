@@ -1,11 +1,12 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
-import { MemoryKvStore } from '@fedify/fedify'
+import { InProcessMessageQueue, MemoryKvStore } from '@fedify/fedify'
 import { Store } from './store.ts'
 import { buildFederation, activityFor } from './federation.ts'
 import { startFakeRemote, TEST_CONFIG, type FakeRemote } from '../test/fake-remote.ts'
 import { entry } from '../test/feeds.ts'
+import { captureLogs } from '../test/logs.ts'
 
 let remote: FakeRemote
 before(async () => {
@@ -139,4 +140,56 @@ test('activityFor builds Create, Update and Delete with stable ids', async () =>
   assert.equal(create.id?.href, 'https://ap.test/users/inner-monologue/posts/a#create')
   assert.equal(update.id?.href, `https://ap.test/users/inner-monologue/posts/a#update-${post.contentHash.slice(0, 12)}`)
   assert.equal(remove.id?.href, 'https://ap.test/users/inner-monologue/posts/a#delete')
+})
+
+test('follows and unfollows are logged', async () => {
+  const logs = await captureLogs()
+  const { post } = setup()
+  const follow = {
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    id: `${remote.origin}/follows/2`,
+    type: 'Follow',
+    actor: remote.actorId,
+    object: 'https://ap.test/users/inner-monologue',
+  }
+  await post('/users/inner-monologue/inbox', follow)
+  await post('/inbox', { '@context': 'https://www.w3.org/ns/activitystreams', id: `${remote.origin}/undos/2`, type: 'Undo', actor: remote.actorId, object: follow })
+  assert.deepEqual(logs.lines('warmhole.followers'), [`${remote.actorId} followed inner-monologue`, `${remote.actorId} unfollowed inner-monologue`])
+})
+
+test('followers on an inbox that is gone are removed and logged', async () => {
+  const logs = await captureLogs()
+  const store = new Store(new DatabaseSync(':memory:'))
+  store.migrate()
+  const federation = buildFederation({ config: TEST_CONFIG, store, kv: new MemoryKvStore(), queue: new InProcessMessageQueue(), allowPrivateAddress: true })
+  const stop = new AbortController()
+  const queue = federation.startQueue(undefined, { signal: stop.signal })
+  const gone = `${remote.origin}/gone/inbox`
+  store.addFollower('inner-monologue', { actorId: `${remote.origin}/users/bob`, inbox: gone, sharedInbox: null })
+  store.addFollower('inner-monologue', { actorId: remote.actorId, inbox: remote.inbox, sharedInbox: remote.sharedInbox })
+  store.applyChanges('inner-monologue', { create: [entry('a')], update: [], delete: [], silent: false })
+  const ctx = federation.createContext(new URL('https://ap.test'), undefined)
+  const activity = activityFor(ctx, 'inner-monologue', store.getPostBySlug('inner-monologue', 'a')!, 'Create')
+  await ctx.sendActivity({ identifier: 'inner-monologue' }, 'followers', activity, { preferSharedInbox: true })
+  for (let i = 0; i < 100 && store.countFollowers('inner-monologue') > 1; i++) await new Promise((resolve) => setTimeout(resolve, 20))
+  stop.abort()
+  await queue
+  assert.deepEqual(store.listFollowers('inner-monologue', { offset: 0, limit: 10 }).map((f) => f.actorId), [remote.actorId])
+  assert.deepEqual(logs.lines('warmhole.followers'), [`removed 1 followers at ${gone} after delivery failed for good (http)`])
+})
+
+test('sending to followers reads them in one go', async () => {
+  const logs = await captureLogs()
+  const { store, federation, get } = setup()
+  store.addFollower('inner-monologue', { actorId: remote.actorId, inbox: remote.inbox, sharedInbox: remote.sharedInbox })
+  store.applyChanges('inner-monologue', { create: [entry('a')], update: [], delete: [], silent: false })
+  const ctx = federation.createContext(new URL('https://ap.test'), undefined)
+  const activity = activityFor(ctx, 'inner-monologue', store.getPostBySlug('inner-monologue', 'a')!, 'Create')
+  await ctx.sendActivity({ identifier: 'inner-monologue' }, 'followers', activity, { preferSharedInbox: true })
+  assert.deepEqual(logs.records.filter((r) => r.level === 'warning').map((r) => r.rawMessage), [])
+
+  const collection = (await (await get('/users/inner-monologue/followers')).json()) as Record<string, any>
+  assert.equal(collection.totalItems, 1)
+  assert.ok(collection.first)
+  assert.equal(collection.items, undefined)
 })
