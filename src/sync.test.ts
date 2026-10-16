@@ -9,6 +9,7 @@ import { FeedError, type FeedEntry } from './feed.ts'
 import { GuardError } from './diff.ts'
 import { startFakeRemote, TEST_CONFIG, type FakeRemote } from '../test/fake-remote.ts'
 import { entry, rss } from '../test/feeds.ts'
+import { captureLogs } from '../test/logs.ts'
 
 let remote: FakeRemote
 before(async () => {
@@ -125,4 +126,17 @@ test('syncs for the same site never overlap', async () => {
   const results = await Promise.all([syncer.sync('inner-monologue'), syncer.sync('inner-monologue'), syncer.sync('inner-monologue')])
   assert.equal(maxRunning, 1)
   assert.deepEqual(results.map((r) => r.new), [1, 0, 0])
+})
+
+test('each sync logs one line with what changed', async () => {
+  const logs = await captureLogs()
+  const { syncer, setFeed } = setup()
+  setFeed([entry('a'), entry('b')])
+  await syncer.sync('inner-monologue')
+  setFeed([entry('a', { title: 'Edited' }), entry('b'), entry('c')])
+  await syncer.sync('inner-monologue')
+  assert.deepEqual(logs.lines('warmhole.sync'), [
+    'first sync of inner-monologue stored 2 posts without sending them',
+    'synced inner-monologue: 1 new, 1 updated, 0 deleted',
+  ])
 })

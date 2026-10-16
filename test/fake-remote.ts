@@ -53,6 +53,11 @@ export async function startFakeRemote(): Promise<FakeRemote> {
       )
       return
     }
+    if (req.method === 'POST' && req.url?.startsWith('/gone/')) {
+      res.writeHead(410)
+      res.end()
+      return
+    }
     if (req.method === 'POST') {
       const body = JSON.parse(await readBody(req)) as Record<string, unknown>
       deliveries.push({ path: req.url ?? '', type: String(body.type), body })

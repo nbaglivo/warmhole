@@ -3,21 +3,15 @@ import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { serve } from '@hono/node-server'
 import { SqliteKvStore, SqliteMessageQueue } from '@fedify/sqlite'
-import { configure, getConsoleSink, getJsonLinesFormatter, getLogger } from '@logtape/logtape'
+import { getLogger } from '@logtape/logtape'
+import { setupLogging } from './logging.ts'
 import { loadConfig } from './config.ts'
 import { Store } from './store.ts'
 import { buildFederation } from './federation.ts'
 import { Syncer } from './sync.ts'
 import { buildApp } from './app.ts'
 
-await configure({
-  sinks: { console: getConsoleSink({ formatter: getJsonLinesFormatter() }) },
-  loggers: [
-    { category: ['warmhole'], sinks: ['console'], lowestLevel: 'info' },
-    { category: ['fedify'], sinks: ['console'], lowestLevel: 'info' },
-    { category: ['logtape', 'meta'], sinks: ['console'], lowestLevel: 'warning' },
-  ],
-})
+await setupLogging()
 const logger = getLogger(['warmhole'])
 
 const config = loadConfig(process.env.WARMHOLE_CONFIG ?? './warmhole.json')

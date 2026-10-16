@@ -2,10 +2,13 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
 import { federation as fedifyMiddleware } from '@fedify/hono'
 import type { Federation } from '@fedify/fedify'
+import { getLogger } from '@logtape/logtape'
 import type { Config, SiteConfig } from './config.ts'
 import type { SyncResult } from './sync.ts'
 import { FeedError } from './feed.ts'
 import { GuardError } from './diff.ts'
+
+const logger = getLogger(['warmhole', 'sync'])
 
 export type AppDeps = {
   config: Config
@@ -75,9 +78,12 @@ export function buildApp({ config, federation, syncer }: AppDeps): Hono {
     try {
       return c.json(await syncer.sync(site.id))
     } catch (error) {
-      if (error instanceof FeedError) return c.json({ error: error.message }, 502)
-      if (error instanceof GuardError) return c.json({ error: error.message }, 422)
-      throw error
+      if (error instanceof FeedError || error instanceof GuardError) {
+        logger.warn('sync of {site} failed: {reason}', { site: site.id, reason: error.message })
+        return c.json({ error: error.message }, error instanceof FeedError ? 502 : 422)
+      }
+      logger.error('sync of {site} crashed: {error}', { site: site.id, error })
+      return c.json({ error: 'internal error' }, 500)
     }
   })
 

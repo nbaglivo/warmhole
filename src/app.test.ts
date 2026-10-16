@@ -9,6 +9,7 @@ import { FeedError } from './feed.ts'
 import { GuardError } from './diff.ts'
 import { TEST_CONFIG } from '../test/fake-remote.ts'
 import type { SyncResult } from './sync.ts'
+import { captureLogs } from '../test/logs.ts'
 
 function setup(sync: (siteId: string) => Promise<SyncResult> = async () => ({ new: 1, updated: 0, deleted: 0 })) {
   const store = new Store(new DatabaseSync(':memory:'))
@@ -101,6 +102,23 @@ test('sync maps feed errors to 502 and guards to 422', async () => {
   const refused = await guarded.request('/sites/inner-monologue/sync', { method: 'POST', headers })
   assert.equal(refused.status, 422)
   assert.deepEqual(await refused.json(), { error: 'feed has no entries' })
+})
+
+test('failed syncs are logged', async () => {
+  const logs = await captureLogs()
+  const headers = { authorization: 'Bearer secret' }
+  await setup(async () => {
+    throw new FeedError('fetching https://innermonologue.test/feed.xml returned 500')
+  }).request('/sites/inner-monologue/sync', { method: 'POST', headers })
+  const crashed = await setup(async () => {
+    throw new Error('disk full')
+  }).request('/sites/inner-monologue/sync', { method: 'POST', headers })
+  assert.equal(crashed.status, 500)
+  assert.deepEqual(logs.lines('warmhole.sync'), [
+    'sync of inner-monologue failed: fetching https://innermonologue.test/feed.xml returned 500',
+    'sync of inner-monologue crashed: Error: disk full',
+  ])
+  assert.deepEqual(logs.records.filter((r) => r.category.join('.') === 'warmhole.sync').map((r) => r.level), ['warning', 'error'])
 })
 
 test('healthz and Fedify routes are reachable', async () => {

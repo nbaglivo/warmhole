@@ -1,11 +1,14 @@
 import type { Federation } from '@fedify/fedify'
+import { getLogger } from '@logtape/logtape'
 import type { Config } from './config.ts'
 import { fetchFeed as defaultFetchFeed, normalizeFeed } from './feed.ts'
 import { diff } from './diff.ts'
 import type { Store } from './store.ts'
 import { activityFor } from './federation.ts'
 
-export type SyncResult = { new: number; updated: number; deleted: number }
+const logger = getLogger(['warmhole', 'sync'])
+
+export type SyncResult ={ new: number; updated: number; deleted: number }
 
 export type SyncDeps = {
   config: Config
@@ -50,7 +53,10 @@ export class Syncer {
     store.applyChanges(siteId, changes)
     await this.flushPending(siteId)
 
-    return { new: changes.create.length, updated: changes.update.length, deleted: changes.delete.length }
+    const result = { new: changes.create.length, updated: changes.update.length, deleted: changes.delete.length }
+    if (changes.silent) logger.info('first sync of {site} stored {new} posts without sending them', { site: siteId, ...result })
+    else logger.info('synced {site}: {new} new, {updated} updated, {deleted} deleted', { site: siteId, ...result })
+    return result
   }
 
   async flushPending(siteId: string): Promise<void> {
