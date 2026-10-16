@@ -34,6 +34,20 @@ Design and diagrams: [`docs/design.html`](docs/design.html).
 
 3. Put it behind HTTPS at the `publicUrl` from your config.
 
+On a server of your own, `compose.yml` runs warmhole behind Caddy, which gets
+the HTTPS certificate for you. Point your domain's DNS at the server, then:
+
+```bash
+cp warmhole.example.json warmhole.json
+cp .env.example .env
+docker compose up -d --build
+```
+
+`.env` sets `WARMHOLE_DOMAIN` (the host of `publicUrl`) and each site's sync
+token. To move to another server, copy `warmhole.json`, `.env` and the
+`warmhole-data` volume, then point the DNS at the new machine. Keep
+`publicUrl` the same: it is your account's identity in the fediverse.
+
 Without Docker: `mise install && npm ci && npm start`. Settings come from
 `WARMHOLE_CONFIG` (default `./warmhole.json`), `WARMHOLE_DB` (default
 `./data/warmhole.db`) and `PORT` (default `8080`).

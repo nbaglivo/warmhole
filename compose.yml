@@ -1,0 +1,29 @@
+services:
+  warmhole:
+    build: .
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    volumes:
+      - ./warmhole.json:/config/warmhole.json:ro
+      - warmhole-data:/data
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - warmhole
+
+volumes:
+  warmhole-data:
+  caddy-data:
+  caddy-config:
